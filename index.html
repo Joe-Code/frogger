@@ -10,5 +10,38 @@
 <body>
     <h1>Frogger</h1>
     <canvas id="gameCanvas" width="600" height="600"></canvas>
+    <div id="controls">
+        <div class="control-row">
+            <button id="btnUp" class="control-btn" aria-label="Up">&#8593;</button>
+        </div>
+        <div class="control-row">
+            <button id="btnLeft" class="control-btn" aria-label="Left">&#8592;</button>
+            <button id="btnDown" class="control-btn" aria-label="Down">&#8595;</button>
+            <button id="btnRight" class="control-btn" aria-label="Right">&#8594;</button>
+        </div>
+    </div>
+
+    <script>
+        function triggerArrowKey(key) {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key }));
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            const up = document.getElementById('btnUp');
+            const down = document.getElementById('btnDown');
+            const left = document.getElementById('btnLeft');
+            const right = document.getElementById('btnRight');
+            if (up && down && left && right) {
+                up.addEventListener('mousedown', e => { e.preventDefault(); triggerArrowKey('ArrowUp'); });
+                down.addEventListener('mousedown', e => { e.preventDefault(); triggerArrowKey('ArrowDown'); });
+                left.addEventListener('mousedown', e => { e.preventDefault(); triggerArrowKey('ArrowLeft'); });
+                right.addEventListener('mousedown', e => { e.preventDefault(); triggerArrowKey('ArrowRight'); });
+                // Touch support
+                up.addEventListener('touchstart', e => { e.preventDefault(); triggerArrowKey('ArrowUp'); });
+                down.addEventListener('touchstart', e => { e.preventDefault(); triggerArrowKey('ArrowDown'); });
+                left.addEventListener('touchstart', e => { e.preventDefault(); triggerArrowKey('ArrowLeft'); });
+                right.addEventListener('touchstart', e => { e.preventDefault(); triggerArrowKey('ArrowRight'); });
+            }
+        });
+    </script>
 </body>
 </html>
