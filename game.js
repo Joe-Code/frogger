@@ -100,6 +100,10 @@ const lanes = [
 
 let score = 0;
 
+// Countdown timer for frog reset
+let frogResetCountdown = 0; // Countdown timer in frames (0 means no countdown)
+let frogCanMove = true;     // Flag to control whether the frog can move
+
 // --- 2D GAMELOOP ---
 function gameLoop() {
     if (!ctx) {
@@ -137,6 +141,7 @@ function gameLoop() {
     drawPowerUps();
     drawLeaderboard();
     drawPowerUpText(); // Draw any active power-up text notification
+    drawCountdownText(); // Draw countdown text if active
     moveObstacles();
     checkCollisionsAndLogs();
     checkWinCondition();
@@ -150,11 +155,24 @@ function gameLoop() {
             resetFrogAndLoseLife();
             resetTimer();
         }
-    }
-    // Power-up timer
+    }    // Power-up timer
     if (powerUpActive) {
         powerUpTimer--;
-        if (powerUpTimer <= 0) powerUpActive = null;
+        if (powerUpTimer <= 0) {
+            // If invincible power-up is ending, stop the sound
+            if (powerUpActive === 'invincible') {
+                invincibleSound.pause();
+                invincibleSound.currentTime = 0;
+            }
+            powerUpActive = null;
+        }
+    }
+    // Handle countdown timer after frog reset
+    if (frogResetCountdown > 0) {
+        frogResetCountdown--;
+        if (frogResetCountdown === 0) {
+            frogCanMove = true; // Enable frog movement when countdown reaches 0
+        }
     }
     requestAnimationFrame(gameLoop);
 }
@@ -182,6 +200,11 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'p') {
         paused = !paused;
         if (paused) {
+            // Pause invincible sound if it's playing
+            if (powerUpActive === 'invincible') {
+                invincibleSound.pause();
+            }
+            
             // Show pause menu (simple text for now)
             const pauseText = document.createElement('div');
             pauseText.id = 'pauseMenu';
@@ -194,13 +217,18 @@ document.addEventListener('keydown', (e) => {
             pauseText.innerText = 'PAUSED\nPress P to Resume';
             document.body.appendChild(pauseText);
         } else {
+            // Resume invincible sound if appropriate
+            if (powerUpActive === 'invincible') {
+                invincibleSound.play().catch(e => console.log("Error resuming invincible sound:", e));
+            }
+            
             // Hide pause menu
             const pauseText = document.getElementById('pauseMenu');
             if (pauseText) pauseText.remove();
         }
     }
     // Frog movement
-    if (!paused) {
+    if (!paused && frogCanMove) {
         const step = 50; // Changed step to 50px to match lane height
         let newFrogY = frog.y;
         const horizontalStep = 40; // Keep horizontal movement at 40px
@@ -280,6 +308,16 @@ function resetTimer() {
 }
 
 function resetFrogAndLoseLife() {
+    // Play collision sound when the frog collides with an obstacle
+    collisionSound.currentTime = 0; // Reset sound to beginning
+    collisionSound.play().catch(e => console.log("Error playing collision sound:", e));
+    
+    // Stop invincible sound if it was playing
+    if (powerUpActive === 'invincible') {
+        invincibleSound.pause();
+        invincibleSound.currentTime = 0;
+    }
+    
     lives--;
     resetFrog();
     resetTimer();
@@ -315,6 +353,9 @@ function resetFrog() {
     frog.y = frogStartingAreaY + (50 - frog.height) / 2; // 550 + 5 = 555
     
     frogStartingY = frog.y; // Store the initial Y position
+    // Start the 3-second countdown (assuming 30fps, 90 frames)
+    frogResetCountdown = 90;
+    frogCanMove = false;
 }
 
 function initObstacles() {
@@ -381,6 +422,23 @@ powerupLifeImg.src = 'powerup_life.png';
 
 let powerupScoreImg = new window.Image();
 powerupScoreImg.src = 'powerup_score.png';
+
+// Audio elements for sound effects
+let collisionSound = new Audio('collision.mp3');
+collisionSound.preload = 'auto';
+
+let invincibleSound = new Audio('Invincible.mp3');
+invincibleSound.preload = 'auto';
+invincibleSound.loop = true; // Loop the invincible sound while the power-up is active
+
+let lifeSound = new Audio('life.mp3');
+lifeSound.preload = 'auto';
+
+let scoreSound = new Audio('score.mp3');
+scoreSound.preload = 'auto';
+
+let homeSound = new Audio('home.mp3');
+homeSound.preload = 'auto';
 
 function drawObstacles() {
     obstacles.forEach(obj => {
@@ -605,17 +663,29 @@ function checkWinCondition() {
     // Frog needs to reach top area (below Y=30 which is within the home slots area)
     if (frog.y <= 30) {
         // Find home slot
-        let slot = Math.floor(frog.x / homeSlotWidth);
-        if (!homeSlots[slot]) {
+        let slot = Math.floor(frog.x / homeSlotWidth);        if (!homeSlots[slot]) {
             homeSlots[slot] = true;
             score++;
             if (score > highScore) highScore = score;
+            
+            // Play home sound when frog reaches a home slot
+            homeSound.currentTime = 0;
+            homeSound.play().catch(e => console.log("Error playing home sound:", e));
         }
+        
+        // Stop invincible sound if it was playing
+        if (powerUpActive === 'invincible') {
+            invincibleSound.pause();
+            invincibleSound.currentTime = 0;
+        }
+        
         resetFrog();
         resetTimer();
         // Clear any active power-up text
         powerUpText = null;
         powerUpTextTimer = 0;
+        powerUpActive = null; // Clear power-up when reaching home
+        
         // All homes filled: next level
         if (homeSlots.every(Boolean)) {
             level++;
@@ -660,10 +730,18 @@ function checkPowerUpCollision() {
             if (p.type === 'invincible') {
                 powerUpActive = 'invincible';
                 powerUpTimer = 300; // 10 seconds
-            } else if (p.type === 'life') {
+                
+                // Play invincible sound
+                invincibleSound.currentTime = 0; // Reset sound to beginning
+                invincibleSound.play().catch(e => console.log("Error playing invincible sound:", e));            } else if (p.type === 'life') {
                 lives++;
+                // Play life sound when collecting life power-up                lifeSound.currentTime = 0; // Reset sound to beginning
+                lifeSound.play().catch(e => console.log("Error playing life sound:", e));
             } else if (p.type === 'score') {
                 score += 10;
+                // Play score sound when collecting score power-up
+                scoreSound.currentTime = 0; // Reset sound to beginning
+                scoreSound.play().catch(e => console.log("Error playing score sound:", e));
             }
             return false; // Remove power-up after collection
         }
@@ -870,5 +948,36 @@ function drawPowerUpText() {
         
         // Decrease the timer
         powerUpTextTimer--;
+    }
+}
+
+// Function to draw countdown text during frog reset
+function drawCountdownText() {
+    if (frogResetCountdown > 0) {
+        // Calculate position (centered above the frog)
+        const textX = frog.x + frog.width / 2;
+        const textY = frog.y - 15; // Position above the frog
+        
+        // Calculate the current countdown number (3, 2, 1)
+        let countdownValue;
+        if (frogResetCountdown > 60) {
+            countdownValue = "3";
+        } else if (frogResetCountdown > 30) {
+            countdownValue = "2";
+        } else {
+            countdownValue = "1";
+        }
+        
+        // Set style for the countdown text
+        ctx.save();
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        const textWidth = ctx.measureText(countdownValue).width;
+        ctx.fillRect(textX - textWidth / 2 - 6, textY - 10, textWidth + 12, 20);
+        ctx.fillStyle = '#FF9900'; // Orange color
+        ctx.fillText(countdownValue, textX, textY);
+        ctx.restore();
     }
 }
